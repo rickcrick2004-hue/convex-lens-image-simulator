@@ -101,8 +101,8 @@
     <div id="dataCard" class="absolute top-14 sm:top-3 left-3 bg-slate-900/90 backdrop-blur border border-slate-700/90 rounded-2xl p-2.5 sm:p-3 shadow-xl z-10 w-[195px] sm:w-[238px] pointer-events-auto">
       <div class="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-2">
         <span class="text-[11px] sm:text-xs font-black text-slate-300 tracking-wider">📏 観測データ</span>
-        <span id="imageTypeBadge" class="px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/50">
-          倒立実像
+        <span id="imageTypeBadge" class="px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-amber-500/20 text-amber-200 border border-amber-400/50">
+          予想してみよう
         </span>
       </div>
 
@@ -115,15 +115,15 @@
         <div id="dataRevealArea" class="space-y-1.5">
           <div class="flex items-center justify-between">
             <span id="lblImagePos" class="text-slate-400 font-bold">像のできる位置</span>
-            <span id="valImagePos" class="font-black text-cyan-300">右 15.0 cm</span>
+            <span id="valImagePos" class="font-black text-slate-400">？ cm</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-slate-400 font-bold">像の大きさ</span>
-            <span id="valImageSize" class="font-black text-emerald-300">1.5 cm (0.5倍)</span>
+            <span id="valImageSize" class="font-black text-slate-400">？ cm</span>
           </div>
-          <div class="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px] sm:text-xs">
+          <div id="screenPosRow" class="flex items-center justify-between pt-1 border-t border-slate-800 text-[11px] sm:text-xs">
             <span class="text-slate-400 font-bold">スクリーン位置</span>
-            <span id="valScreenPos" class="font-bold text-slate-200">右 15.0 cm</span>
+            <span id="valScreenPos" class="font-bold text-slate-500">まだ出ていません</span>
           </div>
         </div>
 
@@ -139,8 +139,8 @@
       <!-- ミニモニター（スクリーン正面／虫めがね視点） -->
       <div class="hidden md:flex flex-col items-center bg-slate-900/90 backdrop-blur border border-slate-700/90 rounded-2xl p-2 shadow-xl w-[132px]">
         <div class="flex items-center justify-between w-full mb-1 px-0.5">
-          <span id="previewTitle" class="text-[10px] font-black text-cyan-300">📺 スクリーン正面</span>
-          <span id="previewFocusTag" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">くっきり</span>
+          <span id="previewTitle" class="text-[10px] font-black text-slate-300">📺 像の見え方</span>
+          <span id="previewFocusTag" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">予想中</span>
         </div>
         <canvas id="previewCanvas" width="112" height="112" class="w-[112px] h-[112px] rounded-xl bg-slate-950 border border-slate-700"></canvas>
       </div>
@@ -177,7 +177,7 @@
 
     <!-- 右下：操作ヒント -->
     <div class="hidden lg:flex absolute bottom-3 right-3 items-center gap-2 bg-slate-900/85 backdrop-blur px-3 py-1.5 rounded-2xl border border-slate-700/80 shadow-lg z-10 text-[11px] font-bold text-slate-400 pointer-events-none">
-      <span>👆 光源・スクリーンは左右にドラッグ可能 ／ ピンチで拡大縮小</span>
+      <span>👆 光源を動かして予想 →「光を出す」で結像 ／ スクリーン出現後は左右移動OK</span>
     </div>
   </main>
 
@@ -217,7 +217,7 @@
 
     <!-- 右：スクリーン自動ピント・数値表示トグル・リセット -->
     <div class="flex items-center gap-1.5 shrink-0">
-      <button id="autoFocusBtn" class="btn-touch bg-slate-700 text-cyan-300 border-2 border-cyan-400 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl shadow cursor-pointer flex items-center gap-1" title="スクリーンを実像ができる位置に自動で合わせます">
+      <button id="autoFocusBtn" disabled class="btn-touch bg-slate-900/70 text-slate-500 border-2 border-slate-800 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl cursor-not-allowed flex items-center gap-1 opacity-60" title="スクリーンを実像ができる位置に自動で合わせます">
         <span>🎯</span>
         <span id="autoFocusLabel">自動ピント</span>
       </button>
@@ -251,6 +251,7 @@
     const lblImagePos = document.getElementById('lblImagePos');
     const valImagePos = document.getElementById('valImagePos');
     const valImageSize = document.getElementById('valImageSize');
+    const screenPosRow = document.getElementById('screenPosRow');
     const valScreenPos = document.getElementById('valScreenPos');
     const dataRevealArea = document.getElementById('dataRevealArea');
     const dataHiddenNote = document.getElementById('dataHiddenNote');
@@ -261,8 +262,8 @@
     const emitLightBtn = document.getElementById('emitLightBtn');
     const emitIcon = document.getElementById('emitIcon');
     const emitLabel = document.getElementById('emitLabel');
+    const posButtons = document.querySelectorAll('.pos-btn');
 
-    const posButtons = Array.from(document.querySelectorAll('.pos-btn'));
     const autoFocusBtn = document.getElementById('autoFocusBtn');
     const autoFocusLabel = document.getElementById('autoFocusLabel');
     const toggleInfoBtn = document.getElementById('toggleInfoBtn');
@@ -275,56 +276,20 @@
     const zoomLabel = document.getElementById('zoomLabel');
 
     // ==========================================
-    // 光学定数とシミュレーション状態
+    // 光学定数 ＆ 状態変数
     // ==========================================
-    let width = 0, height = 0;
+    const FOCAL_CM = 10.0;          // 焦点距離 10cm 固定
+    const SOURCE_HEIGHT_CM = 3.0;   // 光源（矢印）の高さ 3.0cm
+    const PX_PER_CM = 14;           // 基準スケール (1cm = 14px)
+    const LENS_HALF_H_CM = 9.5;     // 凸レンズの半径（高さの半分）
+    const SCREEN_HALF_H_CM = 8.5;   // スクリーンの高さの半分
+    const MIN_SOURCE_CM = 3.5;      // 光源の最小距離
+    const MAX_SOURCE_CM = 35.0;     // 光源の最大距離
+    const MIN_SCREEN_CM = 6.0;      // スクリーンの最小距離
+    const MAX_SCREEN_CM = 38.0;     // スクリーンの最大距離
+    const PRESET_POSITIONS = [30, 20, 15, 10, 7, 5];
 
-    // 光学座標系定数：1.0 cm = 12 px
-    const PX_PER_CM = 12;
-    const FOCAL_CM = 10.0;        // 焦点距離 f = 10cm（固定）
-    const SOURCE_HEIGHT_CM = 3.0; // 光源の高さ h = 3.0cm（7cm虚像で高さ10.0cmと収まりが良いサイズ）
-    const LENS_HALF_H_CM = 13.5;  // 凸レンズの半径（cm換算）
-    const SCREEN_HALF_H_CM = 11.0;// スクリーンの高さの半分（cm換算）
-
-    // ドラッグ可動範囲（cm）
-    const MIN_SOURCE_CM = 4.0;
-    const MAX_SOURCE_CM = 35.0;
-    const MIN_SCREEN_CM = 6.0;
-    const MAX_SCREEN_CM = 38.0;
-
-    // プリセット位置（軽く吸着するターゲット）
-    const SNAP_POINTS_CM = [5, 7, 10, 15, 20, 30];
-
-    // 状態変数
-    let sourceDistCm = 30.0;      // 初期位置：30cm
-    let screenDistCm = 15.0;      // 初期スクリーン位置：30cmの実像位置(15cm)
-    let isAutoFocus = true;       // 実像時にスクリーンを自動ピント位置へ合わせるか
-    let showInfo = true;          // 数値・解説バナーの表示ON/OFF（初期ON）
-
-    let isLightActive = false;    // 光の点灯状態
-    let animProgress = 0;         // 光アニメーション進行度 (0.0 〜 1.0)
-    let isAnimating = false;      // アニメーション再生中フラグ
-    const ANIM_SPEED = 0.0055;    // 生徒が目で追いやすいゆっくりスピード
-    let pulseTime = 0;            // アニメーション完了後の光パルス用
-
-    // ズーム＆パン
-    let zoom = 1.0;
-    let baseFitZoom = 1.0;
-    const MIN_ZOOM = 0.45;
-    const MAX_ZOOM = 2.6;
-    let panX = 0;
-    let panY = 0;
-
-    // 操作状態
-    let draggingTarget = null;    // 'source' | 'screen' | 'pan' | null
-    let hoverTarget = null;       // 'source' | 'screen' | null
-    let pointerDownX = 0, pointerDownY = 0;
-    let panStartX = 0, panStartY = 0;
-    let hasDragged = false;
-    let initialPinchDist = null;
-    let initialPinchZoom = 1.0;
-
-    // 光線のカラーパレット（参考index.htmlと統一）
+    // 光線のカラーパレット（index.html の発光レーザー表現を踏襲）
     const RAY_COLORS = {
       parallel: {
         core: '#ffffff',
@@ -337,120 +302,170 @@
         mid: '#6ee7b7',
         glow: 'rgba(16, 185, 129, 0.35)',
         shadow: '#10b981'
-      },
-      virtualExt: {
-        line: 'rgba(216, 180, 254, 0.85)',
-        glow: 'rgba(192, 132, 252, 0.5)'
       }
     };
 
+    // キャンバス・ビューポート状態
+    let width = 0;
+    let height = 0;
+    let zoom = 1.0;
+    let baseZoom = 1.0;
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 2.6;
+    let panX = 0;
+    let panY = 0;
+
+    // 光学シミュレーション状態
+    let sourceDistCm = 30.0;       // 現在の光源位置 (cm)
+    let screenDistCm = 15.0;       // 現在のスクリーン位置 (cm)
+    let isAutoFocus = true;        // スクリーン自動ピントフラグ
+    let showInfo = true;           // 数値・解説バナーの表示フラグ
+
+    let isLightActive = false;     // 光の点灯状態
+    let animProgress = 0;          // 光アニメーション進行度 (0.0 〜 1.0)
+    let isAnimating = false;       // アニメーション再生中フラグ
+    let hasRevealedResult = false; // 光が集まって像・結果が表示されたかどうかのフラグ
+    const ANIM_SPEED = 0.0055;     // 生徒が目で追いやすいゆっくりスピード
+    let pulseTime = 0;             // アニメーション完了後の光パルス用
+
+    // ポインター・タッチ操作状態
+    let draggingTarget = null;     // 'source' | 'screen' | 'pan' | null
+    let hoverTarget = null;        // 'source' | 'screen' | null
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+    let panStartX = 0;
+    let panStartY = 0;
+    let hasDragged = false;
+    let initialPinchDist = null;
+    let initialPinchZoom = 1.0;
+
     // ==========================================
-    // 光学計算エンジン（実像・虚像・焦点上・ピントボケ）
+    // 光学計算エンジン
     // ==========================================
+    // 実像ができてスクリーンを表示すべき状態かどうかを判定
+    function isScreenVisible(opt) {
+      return isLightActive && opt.type === 'real' && animProgress >= 0.88;
+    }
+
     function calculateOptics() {
       const u = sourceDistCm;
       const f = FOCAL_CM;
       const h = SOURCE_HEIGHT_CM;
 
-      let type = 'real'; // 'real' | 'virtual' | 'none'
-      let v = null;      // 像の位置(cm): 正なら右(実像)、負なら左(虚像)
-      let mag = null;    // 倍率(絶対値)
-      let imgHeightCm = null;
+      const sx = -u * PX_PER_CM;
+      const sy = -h * PX_PER_CM; // キャンバス上方向がマイナス
+      const fPx = f * PX_PER_CM;
+      const screenX = screenDistCm * PX_PER_CM;
 
-      if (Math.abs(u - f) < 0.05) {
+      let type = 'none'; // 'real' | 'virtual' | 'none'
+      let v = Infinity;
+      let mag = 0;
+      let imgHeightCm = 0;
+      let imgX = 0;
+      let imgTipY = 0;
+
+      if (Math.abs(u - f) < 0.15) {
         type = 'none';
       } else if (u > f) {
         type = 'real';
         v = (u * f) / (u - f);
         mag = v / u;
         imgHeightCm = h * mag;
+        imgX = v * PX_PER_CM;
+        imgTipY = imgHeightCm * PX_PER_CM; // 倒立なので下方向（プラス）
       } else {
         type = 'virtual';
         v = (u * f) / (u - f); // 負の値（レンズの左側）
         mag = Math.abs(v) / u;
         imgHeightCm = h * mag;
+        imgX = v * PX_PER_CM; // 負のX座標（左側）
+        imgTipY = -imgHeightCm * PX_PER_CM; // 正立なので上方向（マイナス）
       }
 
-      // ワールド座標(px)変換
-      const sx = -u * PX_PER_CM;
-      const sy = -h * PX_PER_CM; // 光源の先端（上向きなのでマイナス）
-      const screenX = screenDistCm * PX_PER_CM;
-
-      // レンズ通過後の2本の光の傾き（x >= 0）
-      // ① 平行な光：(0, sy) -> (f*S, 0) を通る
-      const slopeParallel = (0 - sy) / (f * PX_PER_CM);
+      // ① 平行な光：(sx, sy) -> (0, sy) -> 右焦点(fPx, 0)を通って直進
+      const slopeParallel = (0 - sy) / (fPx - 0);
       // ② 中心を通る光：(sx, sy) -> (0, 0) をそのまま直進
       const slopeCenter = (0 - sy) / (0 - sx);
 
       // 右側の光が到達するX座標
-      // 実像時はスクリーンで止まる。虚像・焦点上はスクリーンまたは右端(24cm先)まで伸ばす
-      const rightEndX = screenX;
-
-      const y1AtScreen = sy + slopeParallel * rightEndX;
-      const y2AtScreen = slopeCenter * rightEndX;
-
-      // 像のワールド座標
-      let imgX = null;
-      let imgTipY = null;
-      if (type === 'real') {
-        imgX = v * PX_PER_CM;
-        imgTipY = imgHeightCm * PX_PER_CM; // 倒立なので下向き(+)
-      } else if (type === 'virtual') {
-        imgX = v * PX_PER_CM; // 負の値(左側)
-        imgTipY = -imgHeightCm * PX_PER_CM; // 正立なので上向き(-)
+      // 実像時はスクリーン（結像点）まで。虚像・焦点上はスクリーンを出さず右へ伸ばす
+      let rightEndX = screenX;
+      if (type === 'virtual') {
+        rightEndX = 24 * PX_PER_CM;
+      } else if (type === 'none') {
+        rightEndX = 28 * PX_PER_CM;
       }
 
-      // スクリーン上のピント精度計算（実像時のみ意味を持つ）
-      // 2本の光がスクリーン上でどれだけ離れているか(px)
-      const spreadPx = Math.abs(y1AtScreen - y2AtScreen);
-      const isFocused = type === 'real' && Math.abs(screenDistCm - v) <= 0.35;
+      const y1AtRight = sy + slopeParallel * rightEndX;
+      const y2AtRight = slopeCenter * rightEndX;
 
-      // スクリーン上の像の予測高さ（ボケを含めた中心位置）
-      const screenTipY = (y1AtScreen + y2AtScreen) / 2;
+      // スクリーン上でのピント判定（実像時のみ意味を持つ）
+      const spreadPx = Math.abs(y1AtRight - y2AtRight);
+      const isFocused = type === 'real' && Math.abs(screenDistCm - v) < 0.35;
+      const screenTipY = (y1AtRight + y2AtRight) / 2;
 
       return {
-        u, f, h,
-        type, v, mag, imgHeightCm,
-        sx, sy,
+        u,
+        f,
+        h,
+        sx,
+        sy,
+        fPx,
+        type,
+        v,
+        mag,
+        imgHeightCm,
+        imgX,
+        imgTipY,
         screenX,
-        slopeParallel, slopeCenter,
         rightEndX,
-        y1AtScreen, y2AtScreen,
-        imgX, imgTipY,
-        spreadPx, isFocused, screenTipY
+        slopeParallel,
+        slopeCenter,
+        y1AtRight,
+        y2AtRight,
+        spreadPx,
+        isFocused,
+        screenTipY
       };
     }
 
-    // ==========================================
-    // 画面リサイズ・自動フィット・座標変換
-    // ==========================================
-    function fitToScreen() {
-      // 左30cm（光源・7cmの虚像-23.3cm）から右30cm（15cmの実像）まで左右対称にバランスよく入る幅
-      const targetWorldW = 860;
-      const targetWorldH = 410;
-      const scaleW = (width - 60) / targetWorldW;
-      const scaleH = (height - 80) / targetWorldH;
-      baseFitZoom = Math.max(0.5, Math.min(1.2, Math.min(scaleW, scaleH)));
-      zoom = baseFitZoom;
-
-      panX = 0;
-      panY = 14 * zoom;
-      zoomLabel.textContent = `${Math.round((zoom / baseFitZoom) * 100)}%`;
+    // 自動ピント時にスクリーン位置を実像位置へ同期
+    function syncScreenToAutoFocus() {
+      if (!isAutoFocus) return;
+      const u = sourceDistCm;
+      if (u > FOCAL_CM + 0.15) {
+        const v = (u * FOCAL_CM) / (u - FOCAL_CM);
+        screenDistCm = Math.max(MIN_SCREEN_CM, Math.min(MAX_SCREEN_CM, v));
+      } else {
+        screenDistCm = 20.0;
+      }
     }
 
+    // ==========================================
+    // 画面リサイズ・座標変換・全体フィット
+    // ==========================================
     function resizeCanvas() {
       const rect = canvas.parentElement.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      const isFirst = width === 0;
       width = rect.width;
       height = rect.height;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fitToScreen();
+    }
 
-      if (isFirst) {
-        fitToScreen();
-      }
+    function fitToScreen() {
+      // 左34cm〜右34cm（計68cm）、上下26cmがちょうど収まるズーム率を計算
+      const targetWorldW = 68 * PX_PER_CM;
+      const targetWorldH = 26 * PX_PER_CM;
+      const fitW = (width * 0.92) / targetWorldW;
+      const fitH = (height * 0.80) / targetWorldH;
+      baseZoom = Math.max(MIN_ZOOM, Math.min(1.35, Math.min(fitW, fitH)));
+      zoom = baseZoom;
+      panX = 0;
+      panY = height * 0.03; // 上部バナーを避けてわずかに下へ配置
+      zoomLabel.textContent = '100%';
     }
 
     function screenToWorld(sx, sy) {
@@ -466,29 +481,22 @@
       zoom = clampedZoom;
       panX = anchorScreenX - width / 2 - beforeWorld.x * zoom;
       panY = anchorScreenY - height / 2 - beforeWorld.y * zoom;
-      const maxPan = 650 * zoom;
+
+      const maxPan = 600 * zoom;
       panX = Math.max(-maxPan, Math.min(maxPan, panX));
       panY = Math.max(-maxPan, Math.min(maxPan, panY));
-      zoomLabel.textContent = `${Math.round((zoom / baseFitZoom) * 100)}%`;
+
+      const relPercent = Math.round((zoom / baseZoom) * 100);
+      zoomLabel.textContent = `${relPercent}%`;
     }
 
     // ==========================================
     // UI更新関数
     // ==========================================
-    function syncScreenToAutoFocus() {
-      if (!isAutoFocus) return;
-      const u = sourceDistCm;
-      if (u > FOCAL_CM + 0.05) {
-        const v = (u * FOCAL_CM) / (u - FOCAL_CM);
-        screenDistCm = Math.max(MIN_SCREEN_CM, Math.min(MAX_SCREEN_CM, Math.round(v * 10) / 10));
-      } else {
-        // 虚像や焦点上のときは見やすい位置（22cm）にスクリーンを置く
-        screenDistCm = 22.0;
-      }
-    }
-
     function updateUI() {
       const opt = calculateOptics();
+      const revealed = isLightActive && animProgress >= 0.88;
+      const screenShown = isScreenVisible(opt);
 
       // 光を出す／消すボタン
       if (isLightActive) {
@@ -501,7 +509,7 @@
         emitLightBtn.className = 'btn-touch flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-black text-xs sm:text-sm lg:text-base px-3.5 sm:px-4 py-2 rounded-2xl shadow-lg border-2 border-amber-200 cursor-pointer shrink-0';
       }
 
-      // プリセットボタンのハイライト
+      // プリセットボタンのハイライト更新
       posButtons.forEach(btn => {
         const pos = Number(btn.dataset.pos);
         btn.classList.remove('active-real', 'active-virtual');
@@ -510,13 +518,19 @@
         }
       });
 
-      // 自動ピントボタン
-      if (isAutoFocus) {
+      // 自動ピントボタン（スクリーン出現後に手動でずらしたときに元の位置へ戻せる）
+      if (!screenShown) {
+        autoFocusBtn.disabled = true;
+        autoFocusBtn.className = 'btn-touch bg-slate-900/70 text-slate-500 border-2 border-slate-800 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl cursor-not-allowed flex items-center gap-1 opacity-60';
+        autoFocusLabel.textContent = '自動ピント';
+      } else if (isAutoFocus) {
+        autoFocusBtn.disabled = false;
         autoFocusBtn.className = 'btn-touch bg-slate-700 text-cyan-300 border-2 border-cyan-400 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl shadow cursor-pointer flex items-center gap-1';
-        autoFocusLabel.textContent = '自動ピント: ON';
+        autoFocusLabel.textContent = 'ピント合致中';
       } else {
-        autoFocusBtn.className = 'btn-touch bg-slate-800 hover:bg-slate-700 text-slate-300 border-2 border-slate-600 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl shadow cursor-pointer flex items-center gap-1';
-        autoFocusLabel.textContent = 'ピントに合わせる';
+        autoFocusBtn.disabled = false;
+        autoFocusBtn.className = 'btn-touch bg-slate-800 hover:bg-slate-700 text-amber-300 border-2 border-amber-400 font-bold text-xs sm:text-sm px-2.5 sm:px-3 py-2 rounded-2xl shadow cursor-pointer flex items-center gap-1';
+        autoFocusLabel.textContent = 'ピントに戻す';
       }
 
       // 数値・解説トグル
@@ -529,14 +543,25 @@
 
       // 観測データパネルの更新
       valSourceDist.textContent = `左 ${opt.u.toFixed(1)} cm`;
-      valScreenPos.textContent = `右 ${screenDistCm.toFixed(1)} cm`;
 
       if (showInfo) {
         dataRevealArea.classList.remove('hidden');
         dataHiddenNote.classList.add('hidden');
         imageTypeBadge.classList.remove('hidden');
 
-        if (opt.type === 'real') {
+        // 光が集まって結果が出る前はネタバレ防止のため「予想してみよう」表示にする
+        if (!revealed) {
+          imageTypeBadge.textContent = isLightActive ? '光の移動中…' : '予想してみよう';
+          imageTypeBadge.className = 'px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-amber-500/20 text-amber-200 border border-amber-400/50';
+          lblImagePos.textContent = '像のできる位置';
+          valImagePos.textContent = '？ cm';
+          valImagePos.className = 'font-black text-slate-400';
+          valImageSize.textContent = '？ cm';
+          valImageSize.className = 'font-black text-slate-400';
+          screenPosRow.classList.remove('hidden');
+          valScreenPos.textContent = 'まだ出ていません';
+          valScreenPos.className = 'font-bold text-slate-500';
+        } else if (opt.type === 'real') {
           imageTypeBadge.textContent = '倒立実像';
           imageTypeBadge.className = 'px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-cyan-500/20 text-cyan-300 border border-cyan-400/50';
           lblImagePos.textContent = '実像の位置';
@@ -544,6 +569,9 @@
           valImagePos.className = 'font-black text-cyan-300';
           valImageSize.textContent = `${opt.imgHeightCm.toFixed(1)} cm (${opt.mag.toFixed(1)}倍)`;
           valImageSize.className = 'font-black text-emerald-300';
+          screenPosRow.classList.remove('hidden');
+          valScreenPos.textContent = `右 ${screenDistCm.toFixed(1)} cm`;
+          valScreenPos.className = 'font-bold text-slate-200';
         } else if (opt.type === 'virtual') {
           imageTypeBadge.textContent = '正立虚像';
           imageTypeBadge.className = 'px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-purple-500/25 text-purple-200 border border-purple-400/60';
@@ -552,6 +580,9 @@
           valImagePos.className = 'font-black text-purple-300';
           valImageSize.textContent = `${opt.imgHeightCm.toFixed(1)} cm (${opt.mag.toFixed(1)}倍)`;
           valImageSize.className = 'font-black text-purple-200';
+          screenPosRow.classList.remove('hidden');
+          valScreenPos.textContent = 'なし（映らない）';
+          valScreenPos.className = 'font-bold text-purple-300/80';
         } else {
           imageTypeBadge.textContent = '像なし';
           imageTypeBadge.className = 'px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black bg-slate-700 text-slate-300 border border-slate-500';
@@ -560,9 +591,13 @@
           valImagePos.className = 'font-black text-slate-400';
           valImageSize.textContent = '―';
           valImageSize.className = 'font-black text-slate-400';
+          screenPosRow.classList.remove('hidden');
+          valScreenPos.textContent = 'なし';
+          valScreenPos.className = 'font-bold text-slate-400';
         }
       } else {
         dataRevealArea.classList.add('hidden');
+        dataHiddenNote.classList.add('hidden');
         dataHiddenNote.classList.remove('hidden');
         imageTypeBadge.classList.add('hidden');
       }
@@ -582,30 +617,39 @@
 
       if (!isLightActive) {
         statusIcon.textContent = '💡';
-        statusText.textContent = `光源は ${opt.u.toFixed(0)}cm の位置です。「光を出す」を押して光の進み方を見よう`;
+        statusText.textContent = `光源は ${opt.u.toFixed(1)}cm の位置です。どこに光が集まるか予想して「光を出す」を押そう`;
+        return;
+      }
+
+      // 光がまだ集まりきっていない移動中のメッセージ
+      if (animProgress < 0.88) {
+        statusIcon.textContent = '✨';
+        statusText.textContent = '2つの光が凸レンズを通って進んでいます… どこに集まるかな？';
         return;
       }
 
       if (opt.type === 'real') {
-        if (!opt.isFocused) {
-          statusIcon.textContent = '🔍';
-          statusText.textContent = `ピントがずれています！スクリーンを 右 ${opt.v.toFixed(1)}cm に動かすとくっきり映ります`;
-        } else if (Math.abs(opt.u - 20) < 0.1) {
-          statusIcon.textContent = '✨';
-          statusText.textContent = `【焦点距離の2倍 (20cm)】レンズの奥 20cm に、光源と同じ大きさの倒立実像ができます`;
-        } else if (opt.u > 20) {
-          statusIcon.textContent = '✨';
-          statusText.textContent = `【2倍より外側 (${opt.u.toFixed(0)}cm)】レンズの奥 ${opt.v.toFixed(1)}cm に、光源より小さい倒立実像（${opt.mag.toFixed(1)}倍）ができます`;
+        if (opt.isFocused) {
+          statusIcon.textContent = '🎯';
+          let relation = '';
+          if (Math.abs(opt.u - 20) < 0.3) {
+            relation = '焦点距離の2倍(20cm)なので、同じ大きさの倒立実像ができます！';
+          } else if (opt.u > 20) {
+            relation = '焦点距離の2倍より外側なので、実物より小さい倒立実像ができます。';
+          } else {
+            relation = '焦点と2倍の間なので、実物より大きい倒立実像ができます！';
+          }
+          statusText.textContent = `【倒立実像】右 ${opt.v.toFixed(1)}cm に集まりました。${relation}`;
         } else {
-          statusIcon.textContent = '✨';
-          statusText.textContent = `【焦点と2倍の間 (${opt.u.toFixed(0)}cm)】レンズの奥 ${opt.v.toFixed(1)}cm に、光源より大きい倒立実像（${opt.mag.toFixed(1)}倍）ができます`;
+          statusIcon.textContent = '🌫️';
+          statusText.textContent = `スクリーンがピント位置（右 ${opt.v.toFixed(1)}cm）からずれているため、像がぼやけて見えます`;
         }
       } else if (opt.type === 'virtual') {
         statusIcon.textContent = '🔎';
-        statusText.textContent = `【焦点の内側 (${opt.u.toFixed(0)}cm)】光は広がりスクリーンには映らず、レンズの奥をのぞくと手前 ${Math.abs(opt.v).toFixed(1)}cm に ${opt.mag.toFixed(1)}倍の正立虚像が見えます`;
+        statusText.textContent = `【正立虚像】光は広がってスクリーンには映らず、レンズをのぞくと左 ${Math.abs(opt.v).toFixed(1)}cm に ${opt.mag.toFixed(1)}倍 の大きな虚像が見えます！`;
       } else {
-        statusIcon.textContent = '⚠️';
-        statusText.textContent = `【ちょうど焦点上 (10cm)】2本の光は平行に進むため、実像も虚像もできません`;
+        statusIcon.textContent = '⚡';
+        statusText.textContent = '光源がちょうど焦点(10cm)にあるため、2本の光が平行になって進み、像はできません。';
       }
     }
 
@@ -615,84 +659,84 @@
     function drawGridAndRuler() {
       ctx.save();
 
-      // 1. 背景方眼グリッド（5cmごと）
-      const step5 = 5 * PX_PER_CM;
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.07)';
-      ctx.lineWidth = 1 / zoom;
-      for (let i = -20; i <= 20; i++) {
-        const pos = i * step5;
-        ctx.beginPath(); ctx.moveTo(pos, -1500); ctx.lineTo(pos, 1500); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-1500, pos); ctx.lineTo(1500, pos); ctx.stroke();
+      // 1. 方眼グリッド (5cm間隔の主線 + 1cm間隔の細線)
+      for (let cm = -50; cm <= 50; cm++) {
+        const x = cm * PX_PER_CM;
+        const isMajor = cm % 5 === 0;
+        ctx.strokeStyle = isMajor ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.04)';
+        ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+        ctx.beginPath();
+        ctx.moveTo(x, -1200);
+        ctx.lineTo(x, 1200);
+        ctx.stroke();
+      }
+      for (let cm = -25; cm <= 25; cm++) {
+        const y = cm * PX_PER_CM;
+        const isMajor = cm % 5 === 0;
+        ctx.strokeStyle = isMajor ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.04)';
+        ctx.lineWidth = (isMajor ? 1.2 : 0.8) / zoom;
+        ctx.beginPath();
+        ctx.moveTo(-1600, y);
+        ctx.lineTo(1600, y);
+        ctx.stroke();
       }
 
-      // 2. 光軸（y = 0）
-      ctx.strokeStyle = 'rgba(226, 232, 240, 0.65)';
+      // 2. 光軸（水平の基準線 y = 0）
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.72)';
       ctx.lineWidth = 2 / zoom;
-      ctx.setLineDash([8 / zoom, 5 / zoom]);
+      ctx.setLineDash([8 / zoom, 6 / zoom]);
       ctx.beginPath();
-      ctx.moveTo(-600, 0);
-      ctx.lineTo(540, 0);
+      ctx.moveTo(-1400, 0);
+      ctx.lineTo(1400, 0);
+      ctx.stroke();
+
+      // 3. 凸レンズの中心線（垂直基準線 x = 0）
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.setLineDash([5 / zoom, 5 / zoom]);
+      ctx.beginPath();
+      ctx.moveTo(0, -LENS_HALF_H_CM * PX_PER_CM - 35);
+      ctx.lineTo(0, LENS_HALF_H_CM * PX_PER_CM + 35);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // 3. 光学台・定規レール（下部 y = +14.5cm 付近に配置して見やすく）
-      const rulerY = 14.2 * PX_PER_CM;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.strokeStyle = 'rgba(71, 85, 105, 0.8)';
-      ctx.lineWidth = 1.5 / zoom;
+      // 4. 光学台定規（cm目盛り）
+      const rulerY = (LENS_HALF_H_CM + 1.8) * PX_PER_CM;
+      ctx.strokeStyle = 'rgba(100, 116, 139, 0.55)';
+      ctx.lineWidth = 2 / zoom;
       ctx.beginPath();
-      ctx.roundRect(-46 * PX_PER_CM, rulerY, 88 * PX_PER_CM, 28, 6);
-      ctx.fill();
+      ctx.moveTo(-36 * PX_PER_CM, rulerY);
+      ctx.lineTo(36 * PX_PER_CM, rulerY);
       ctx.stroke();
 
-      // 1cmごとの目盛り、5cmごとに中目盛り、10cmごとに大目盛り＋数値
-      for (let cm = -45; cm <= 40; cm++) {
+      for (let cm = -35; cm <= 35; cm++) {
         const x = cm * PX_PER_CM;
-        const absCm = Math.abs(cm);
-        let tickH = 5;
-        let strokeCol = 'rgba(148, 163, 184, 0.35)';
+        const isTen = cm % 10 === 0;
+        const isFive = cm % 5 === 0;
+        const tickH = isTen ? 11 : isFive ? 7 : 4;
 
-        if (absCm % 10 === 0) {
-          tickH = 12;
-          strokeCol = cm === 0 ? '#38bdf8' : 'rgba(226, 232, 240, 0.85)';
-        } else if (absCm % 5 === 0) {
-          tickH = 8;
-          strokeCol = 'rgba(148, 163, 184, 0.65)';
-        }
-
-        ctx.strokeStyle = strokeCol;
-        ctx.lineWidth = (absCm % 10 === 0 ? 1.8 : 1) / zoom;
+        ctx.strokeStyle = isTen ? 'rgba(203, 213, 225, 0.85)' : 'rgba(148, 163, 184, 0.45)';
+        ctx.lineWidth = (isTen ? 1.8 : 1) / zoom;
         ctx.beginPath();
-        ctx.moveTo(x, rulerY);
-        ctx.lineTo(x, rulerY + tickH);
+        ctx.moveTo(x, rulerY - tickH / 2);
+        ctx.lineTo(x, rulerY + tickH / 2);
         ctx.stroke();
 
-        // 5cm刻みで数値表示（5, 10, 15, 20, 30, 40など）
-        if (absCm % 5 === 0) {
-          const isMajor = absCm % 10 === 0;
-          ctx.fillStyle = cm === 0 ? '#38bdf8' : isMajor ? '#e2e8f0' : '#94a3b8';
-          ctx.font = `${isMajor ? '900' : '700'} ${(isMajor ? 11 : 9.5) / zoom}px "Noto Sans JP"`;
+        if (isFive) {
+          ctx.fillStyle = isTen ? '#e2e8f0' : 'rgba(148, 163, 184, 0.75)';
+          ctx.font = `${isTen ? '900' : '700'} ${(isTen ? 11 : 9.5) / zoom}px "Noto Sans JP"`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText(cm === 0 ? '0' : `${absCm}`, x, rulerY + 13);
+          ctx.fillText(cm === 0 ? '0' : `${Math.abs(cm)}`, x, rulerY + 8 / zoom);
         }
       }
 
-      // 定規の単位「cm」
-      ctx.fillStyle = '#64748b';
-      ctx.font = `bold ${10 / zoom}px "Noto Sans JP"`;
-      ctx.textAlign = 'right';
-      ctx.fillText('(cm)', 41.5 * PX_PER_CM, rulerY + 13);
-
-      // 4. レンズ中心の垂直補助線
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-      ctx.lineWidth = 1.5 / zoom;
-      ctx.setLineDash([4 / zoom, 4 / zoom]);
-      ctx.beginPath();
-      ctx.moveTo(0, -LENS_HALF_H_CM * PX_PER_CM - 20);
-      ctx.lineTo(0, rulerY);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // 定規の単位ラベル
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+      ctx.font = `bold ${10.5 / zoom}px "Noto Sans JP"`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('(cm)', 36.6 * PX_PER_CM, rulerY);
 
       ctx.restore();
     }
@@ -700,36 +744,36 @@
     // 凸レンズ本体の描画
     function drawConvexLens() {
       ctx.save();
+      const halfWidth = 24;
       const h = LENS_HALF_H_CM * PX_PER_CM;
-      const halfW = 24;
 
-      ctx.shadowColor = 'rgba(56, 189, 248, 0.35)';
-      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.32)';
+      ctx.shadowBlur = 22;
 
-      const grad = ctx.createLinearGradient(-halfW, -h, halfW, h);
-      grad.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
-      grad.addColorStop(0.5, 'rgba(186, 230, 253, 0.2)');
+      const grad = ctx.createLinearGradient(-halfWidth, -h, halfWidth, h);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.36)');
+      grad.addColorStop(0.5, 'rgba(186, 230, 253, 0.22)');
       grad.addColorStop(1, 'rgba(14, 165, 233, 0.42)');
 
       ctx.fillStyle = grad;
       ctx.strokeStyle = '#bae6fd';
-      ctx.lineWidth = 2.5 / zoom;
+      ctx.lineWidth = 2.6 / zoom;
 
       ctx.beginPath();
       ctx.moveTo(0, -h);
-      ctx.quadraticCurveTo(halfW * 1.4, 0, 0, h);
-      ctx.quadraticCurveTo(-halfW * 1.4, 0, 0, -h);
+      ctx.quadraticCurveTo(halfWidth * 1.4, 0, 0, h);
+      ctx.quadraticCurveTo(-halfWidth * 1.4, 0, 0, -h);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       // レンズ内部ハイライト
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = 2 / zoom;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.lineWidth = 1.8 / zoom;
       ctx.beginPath();
-      ctx.moveTo(-halfW * 0.25, -h * 0.78);
-      ctx.quadraticCurveTo(-halfW * 0.85, 0, -halfW * 0.25, h * 0.78);
+      ctx.moveTo(-halfWidth * 0.22, -h * 0.78);
+      ctx.quadraticCurveTo(-halfWidth * 0.85, 0, -halfWidth * 0.22, h * 0.78);
       ctx.stroke();
 
       // レンズ中心点
@@ -741,170 +785,202 @@
       ctx.fill();
       ctx.stroke();
 
-      // 上部ラベル「凸レンズ」
-      ctx.fillStyle = '#7dd3fc';
-      ctx.font = `900 ${12 / zoom}px "Noto Sans JP"`;
+      // 上部ラベル
+      ctx.fillStyle = '#bae6fd';
+      ctx.font = `900 ${11.5 / zoom}px "Noto Sans JP"`;
       ctx.textAlign = 'center';
-      ctx.fillText('凸レンズ', 0, -h - 10 / zoom);
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('凸レンズ', 0, -h - 8 / zoom);
 
       ctx.restore();
     }
 
-    // 焦点 F (10cm) と 2F (20cm) マーカーの描画
-    function drawFocalMarkers() {
+    // 焦点 F (10cm) ＆ 2倍点 2F (20cm) の描画
+    function drawFocalPoints() {
       ctx.save();
-      const markers = [
-        { cm: -10, label: '焦点 F', sub: '10cm', isFocal: true },
-        { cm: 10,  label: '焦点 F', sub: '10cm', isFocal: true },
-        { cm: -20, label: '2F',    sub: '20cm', isFocal: false },
-        { cm: 20,  label: '2F',    sub: '20cm', isFocal: false }
-      ];
+      const fPx = FOCAL_CM * PX_PER_CM;
 
-      markers.forEach(m => {
-        const x = m.cm * PX_PER_CM;
-        if (m.isFocal) {
-          ctx.fillStyle = '#0284c7';
-          ctx.strokeStyle = '#e0f2fe';
-          ctx.lineWidth = 2 / zoom;
-          ctx.beginPath();
-          ctx.arc(x, 0, 7.5 / zoom, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
+      // 焦点 F（±10cm）
+      [-fPx, fPx].forEach(x => {
+        ctx.fillStyle = '#0284c7';
+        ctx.strokeStyle = '#e0f2fe';
+        ctx.lineWidth = 2 / zoom;
+        ctx.beginPath();
+        ctx.arc(x, 0, 8.5 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-          ctx.fillStyle = '#ffffff';
-          ctx.font = `900 ${9.5 / zoom}px "Noto Sans JP"`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('F', x, 0.5 / zoom);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `900 ${10 / zoom}px "Noto Sans JP"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('F', x, 0.5 / zoom);
 
-          ctx.fillStyle = '#7dd3fc';
-          ctx.font = `bold ${11 / zoom}px "Noto Sans JP"`;
-          ctx.textBaseline = 'top';
-          ctx.fillText('焦点', x, 11 / zoom);
-        } else {
-          ctx.fillStyle = '#475569';
-          ctx.strokeStyle = '#94a3b8';
-          ctx.lineWidth = 1.5 / zoom;
-          ctx.beginPath();
-          ctx.arc(x, 0, 4.5 / zoom, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
+        ctx.fillStyle = 'rgba(125, 211, 252, 0.85)';
+        ctx.font = `bold ${9.5 / zoom}px "Noto Sans JP"`;
+        ctx.textBaseline = 'top';
+        ctx.fillText('焦点(10)', x, 13 / zoom);
+      });
 
-          ctx.fillStyle = '#94a3b8';
-          ctx.font = `bold ${10 / zoom}px "Noto Sans JP"`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText('2F', x, 9 / zoom);
-        }
+      // 2F（±20cm）の控えめな基準点
+      [-2 * fPx, 2 * fPx].forEach(x => {
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+        ctx.beginPath();
+        ctx.arc(x, 0, 4 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+        ctx.font = `bold ${9.5 / zoom}px "Noto Sans JP"`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText('2F(20)', x, 9 / zoom);
       });
 
       ctx.restore();
     }
 
-    // 矢印型光源（ろうそくの炎をイメージした光る先端付き）の描画
-    function drawObjectArrow(opt) {
+    // 光源（上向き矢印＋土台：ドラッグで移動＆タップで点灯）
+    function drawLightSource(opt) {
       ctx.save();
-      const x = opt.sx;
-      const tipY = opt.sy; // -36px
+      const { sx, sy } = opt;
       const isHoverOrDrag = draggingTarget === 'source' || hoverTarget === 'source';
 
-      // ドラッグ可能ガイド枠
-      ctx.strokeStyle = isHoverOrDrag ? '#fbbf24' : 'rgba(251, 191, 36, 0.25)';
-      ctx.fillStyle = isHoverOrDrag ? 'rgba(251, 191, 36, 0.12)' : 'rgba(15, 23, 42, 0.25)';
+      // 操作可能エリアのガイド枠
+      ctx.strokeStyle = isHoverOrDrag ? '#fbbf24' : 'rgba(251, 191, 36, 0.28)';
+      ctx.fillStyle = isHoverOrDrag ? 'rgba(251, 191, 36, 0.12)' : 'rgba(15, 23, 42, 0.3)';
       ctx.lineWidth = (isHoverOrDrag ? 2 : 1.2) / zoom;
       ctx.setLineDash([4 / zoom, 3 / zoom]);
       ctx.beginPath();
-      ctx.roundRect(x - 18, tipY - 18, 36, Math.abs(tipY) + 40, 8);
+      ctx.roundRect(sx - 18, sy - 14, 36, Math.abs(sy) + 34, 8);
       ctx.fill();
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // 台座（光学台上のスタンド）
+      // 土台ブロック
       ctx.fillStyle = '#334155';
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = 1.5 / zoom;
+      ctx.strokeStyle = isHoverOrDrag ? '#fbbf24' : '#94a3b8';
+      ctx.lineWidth = 1.6 / zoom;
       ctx.beginPath();
-      ctx.roundRect(x - 12, 0, 24, 14, 4);
+      ctx.roundRect(sx - 14, 0, 28, 14, 4);
       ctx.fill();
       ctx.stroke();
 
-      // 矢印の軸（上向き）
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 5 / zoom;
+      // 上向きの光源矢印本体
+      ctx.shadowColor = isLightActive ? '#fbbf24' : 'rgba(251, 191, 36, 0.35)';
+      ctx.shadowBlur = isLightActive ? 16 : 6;
+
+      const headSize = 13;
+      const headW = 9;
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 6 / zoom;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, tipY + 10);
+      ctx.moveTo(sx, 0);
+      ctx.lineTo(sx, sy + headSize * 0.6);
       ctx.stroke();
 
-      // 矢印の先端三角形
-      ctx.fillStyle = '#fde047';
+      ctx.fillStyle = isLightActive ? '#fef08a' : '#fbbf24';
       ctx.beginPath();
-      ctx.moveTo(x, tipY);
-      ctx.lineTo(x - 9, tipY + 14);
-      ctx.lineTo(x + 9, tipY + 14);
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - headW, sy + headSize);
+      ctx.lineTo(sx + headW, sy + headSize);
       ctx.closePath();
       ctx.fill();
 
-      // 先端の発光コア（ここから2本の光が出る）
+      // 先端の発光コア
       if (isLightActive) {
-        const glow = ctx.createRadialGradient(x, tipY, 0, x, tipY, 16);
-        glow.addColorStop(0, '#ffffff');
-        glow.addColorStop(0.4, 'rgba(253, 224, 71, 0.85)');
-        glow.addColorStop(1, 'rgba(245, 158, 11, 0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(x, tipY, 16, 0, Math.PI * 2);
-        ctx.fill();
+        drawPhoton(sx, sy, '#fde047', 6 / zoom);
       }
-      ctx.fillStyle = isLightActive ? '#ffffff' : '#f59e0b';
-      ctx.beginPath();
-      ctx.arc(x, tipY, 3.8, 0, Math.PI * 2);
-      ctx.fill();
 
-      // ラベル
+      // ラベル表示
+      ctx.shadowBlur = 0;
       ctx.fillStyle = '#fde68a';
-      ctx.font = `900 ${11.5 / zoom}px "Noto Sans JP"`;
+      ctx.font = `900 ${11 / zoom}px "Noto Sans JP"`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      ctx.fillText(`光源 (${opt.u.toFixed(0)}cm)`, x, tipY - 22 / zoom);
+      ctx.fillText(`光源 (${opt.u.toFixed(1)}cm)`, sx, sy - 18 / zoom);
 
-      ctx.fillStyle = isHoverOrDrag ? '#fde047' : 'rgba(148, 163, 184, 0.75)';
+      ctx.fillStyle = isHoverOrDrag ? '#fbbf24' : 'rgba(148, 163, 184, 0.75)';
       ctx.font = `bold ${9.5 / zoom}px "Noto Sans JP"`;
       ctx.textBaseline = 'top';
-      ctx.fillText('◀ 動かす ▶', x, 19 / zoom);
+      ctx.fillText('◀ 動かす ▶', sx, 18 / zoom);
 
       ctx.restore();
     }
 
-    // スクリーンの描画（ドラッグ可能＋像の投影）
+    // 像の位置・大きさコールアウト吹き出し
+    function drawImageCallout(cx, cy, text, borderColor, textColor) {
+      ctx.save();
+      ctx.font = `900 ${11.5 / zoom}px "Noto Sans JP"`;
+      const tw = ctx.measureText(text).width + 18 / zoom;
+      const th = 24 / zoom;
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 1.6 / zoom;
+      ctx.beginPath();
+      ctx.roundRect(cx - tw / 2, cy - th / 2, tw, th, 7 / zoom);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, cx, cy);
+      ctx.restore();
+    }
+
+    // スクリーンの描画（光が集まったタイミングでパッと出現＋像の投影。虚像時は非表示）
     function drawScreenAndRealImage(opt) {
+      // 光が集まって実像ができるタイミングになるまでスクリーンは表示しない
+      if (!isScreenVisible(opt)) return;
+
       ctx.save();
       const sx = opt.screenX;
       const halfH = SCREEN_HALF_H_CM * PX_PER_CM;
       const isHoverOrDrag = draggingTarget === 'screen' || hoverTarget === 'screen';
+
+      // 光が集まった瞬間(0.88〜0.98)にパッと出現するアニメーション係数
+      const appearAlpha = Math.min(1, (animProgress - 0.88) / 0.10);
+      const popScaleY = 0.88 + 0.12 * appearAlpha;
+
+      ctx.save();
+      ctx.globalAlpha = appearAlpha;
+
+      // 集光点にスクリーンが現れた瞬間の光リング演出
+      if (animProgress < 1.0 && opt.isFocused) {
+        const ringT = (animProgress - 0.88) / 0.12;
+        const ringR = (10 + ringT * 34) / zoom;
+        ctx.save();
+        ctx.strokeStyle = `rgba(125, 211, 252, ${Math.max(0, 1 - ringT) * 0.9})`;
+        ctx.lineWidth = 3 / zoom;
+        ctx.beginPath();
+        ctx.arc(opt.imgX, opt.imgTipY, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // スクリーンの土台
       ctx.fillStyle = '#1e293b';
       ctx.strokeStyle = isHoverOrDrag ? '#38bdf8' : '#64748b';
       ctx.lineWidth = (isHoverOrDrag ? 2.2 : 1.5) / zoom;
       ctx.beginPath();
-      ctx.roundRect(sx - 10, halfH, 20, 14, 4);
+      ctx.roundRect(sx - 10, halfH * popScaleY, 20, 14, 4);
       ctx.fill();
       ctx.stroke();
 
       // スクリーン板本体（半透明パネル）
-      ctx.fillStyle = opt.isFocused && isLightActive && animProgress >= 0.92
-        ? 'rgba(56, 189, 248, 0.18)'
+      ctx.fillStyle = opt.isFocused
+        ? 'rgba(56, 189, 248, 0.20)'
         : 'rgba(226, 232, 240, 0.14)';
       ctx.strokeStyle = isHoverOrDrag
         ? '#38bdf8'
-        : opt.isFocused && isLightActive && animProgress >= 0.92
+        : opt.isFocused
           ? '#7dd3fc'
           : '#94a3b8';
       ctx.lineWidth = 3.5 / zoom;
       ctx.beginPath();
-      ctx.roundRect(sx - 4, -halfH, 8, halfH * 2, 3);
+      ctx.roundRect(sx - 4, -halfH * popScaleY, 8, halfH * 2 * popScaleY, 3);
       ctx.fill();
       ctx.stroke();
 
@@ -913,230 +989,187 @@
       ctx.font = `900 ${11.5 / zoom}px "Noto Sans JP"`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      ctx.fillText(`スクリーン (${screenDistCm.toFixed(1)}cm)`, sx, -halfH - 8 / zoom);
+      ctx.fillText(`スクリーン (${screenDistCm.toFixed(1)}cm)`, sx, -halfH * popScaleY - 8 / zoom);
 
       ctx.fillStyle = isHoverOrDrag ? '#38bdf8' : 'rgba(148, 163, 184, 0.7)';
       ctx.font = `bold ${9.5 / zoom}px "Noto Sans JP"`;
       ctx.textBaseline = 'top';
-      ctx.fillText('◀ 動かす ▶', sx, halfH + 17 / zoom);
+      ctx.fillText('◀ 動かす ▶', sx, halfH * popScaleY + 17 / zoom);
 
-      // 実像の描画（光がスクリーンに到達した後）
-      if (isLightActive && animProgress > 0.88 && opt.type === 'real') {
-        const appearAlpha = Math.min(1, (animProgress - 0.88) / 0.12);
+      // 実像の描画
+      const blurFactor = Math.min(1, opt.spreadPx / 45);
+      const tipY = opt.isFocused ? opt.imgTipY : opt.screenTipY;
 
-        // ピントが合っているときはくっきり、ずれているときはボケて薄く表示
-        const blurFactor = Math.min(1, opt.spreadPx / 45);
-        const tipY = opt.isFocused ? opt.imgTipY : opt.screenTipY;
+      ctx.save();
+      ctx.globalAlpha = appearAlpha * (1 - blurFactor * 0.55);
 
+      if (!opt.isFocused) {
+        // ピントずれ時のぼやけグロー
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = Math.min(28, 6 + opt.spreadPx * 0.6);
+      } else {
+        ctx.shadowColor = '#fde047';
+        ctx.shadowBlur = 14;
+      }
+
+      // 倒立実像の矢印（スクリーン上に下向きに映る）
+      const arrowX = sx;
+      const headSize = Math.max(7, Math.min(16, Math.abs(tipY) * 0.25));
+      const headW = headSize * 0.65;
+
+      ctx.strokeStyle = opt.isFocused ? '#fbbf24' : 'rgba(251, 191, 36, 0.65)';
+      ctx.lineWidth = (opt.isFocused ? 5.5 : 5.5 + blurFactor * 8) / zoom;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(arrowX, 0);
+      ctx.lineTo(arrowX, tipY - headSize * 0.6);
+      ctx.stroke();
+
+      ctx.fillStyle = opt.isFocused ? '#fef08a' : 'rgba(254, 240, 138, 0.65)';
+      ctx.beginPath();
+      ctx.moveTo(arrowX, tipY);
+      ctx.lineTo(arrowX - headW, tipY - headSize);
+      ctx.lineTo(arrowX + headW, tipY - headSize);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+
+      // ピント合致時の像サイズ・位置ラベル（数値表示ON時）
+      if (showInfo && opt.isFocused && appearAlpha > 0.6) {
+        drawImageCallout(
+          opt.imgX,
+          opt.imgTipY + 26 / zoom,
+          `倒立実像：右 ${opt.v.toFixed(1)}cm ／ ${opt.imgHeightCm.toFixed(1)}cm (${opt.mag.toFixed(1)}倍)`,
+          '#38bdf8',
+          '#bae6fd'
+        );
+      } else if (showInfo && !opt.isFocused && appearAlpha > 0.6) {
+        // ピントずれのとき、本来の実像位置に小さな目安ピンを表示
         ctx.save();
-        ctx.globalAlpha = appearAlpha * (1 - blurFactor * 0.55);
-
-        if (!opt.isFocused) {
-          // ピントずれ時のぼやけグロー
-          ctx.shadowColor = '#fbbf24';
-          ctx.shadowBlur = Math.min(28, 6 + opt.spreadPx * 0.6);
-        } else {
-          ctx.shadowColor = '#fde047';
-          ctx.shadowBlur = 14;
-        }
-
-        // 倒立実像の矢印（スクリーン上に下向きに映る）
-        const arrowX = sx;
-        const headSize = Math.max(7, Math.min(16, Math.abs(tipY) * 0.25));
-        const headW = headSize * 0.65;
-
-        ctx.strokeStyle = opt.isFocused ? '#fbbf24' : 'rgba(251, 191, 36, 0.65)';
-        ctx.lineWidth = (opt.isFocused ? 5.5 : 5.5 + blurFactor * 8) / zoom;
-        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.7)';
+        ctx.lineWidth = 1.5 / zoom;
+        ctx.setLineDash([4 / zoom, 3 / zoom]);
         ctx.beginPath();
-        ctx.moveTo(arrowX, 0);
-        ctx.lineTo(arrowX, tipY - headSize * 0.6);
+        ctx.moveTo(opt.imgX, 0);
+        ctx.lineTo(opt.imgX, opt.imgTipY);
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        ctx.fillStyle = opt.isFocused ? '#fef08a' : 'rgba(254, 240, 138, 0.65)';
+        ctx.fillStyle = '#fde047';
         ctx.beginPath();
-        ctx.moveTo(arrowX, tipY);
-        ctx.lineTo(arrowX - headW, tipY - headSize);
-        ctx.lineTo(arrowX + headW, tipY - headSize);
-        ctx.closePath();
+        ctx.arc(opt.imgX, opt.imgTipY, 4.5 / zoom, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.restore();
-
-        // ピント合致時の像サイズ・位置ラベル（数値表示ON時）
-        if (showInfo && opt.isFocused && appearAlpha > 0.6) {
-          drawImageCallout(
-            opt.imgX,
-            opt.imgTipY + 26 / zoom,
-            `倒立実像：右 ${opt.v.toFixed(1)}cm ／ ${opt.imgHeightCm.toFixed(1)}cm (${opt.mag.toFixed(1)}倍)`,
-            '#38bdf8',
-            '#bae6fd'
-          );
-        } else if (showInfo && !opt.isFocused && appearAlpha > 0.6) {
-          // ピントずれのとき、本来の実像位置に小さな目安ピンを表示
-          ctx.save();
-          ctx.strokeStyle = 'rgba(250, 204, 21, 0.7)';
-          ctx.lineWidth = 1.5 / zoom;
-          ctx.setLineDash([4 / zoom, 3 / zoom]);
-          ctx.beginPath();
-          ctx.moveTo(opt.imgX, 0);
-          ctx.lineTo(opt.imgX, opt.imgTipY);
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          ctx.fillStyle = '#fde047';
-          ctx.beginPath();
-          ctx.arc(opt.imgX, opt.imgTipY, 4.5 / zoom, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.font = `bold ${10.5 / zoom}px "Noto Sans JP"`;
-          ctx.textAlign = 'center';
-          ctx.fillText(`ピント位置 (${opt.v.toFixed(1)}cm)`, opt.imgX, opt.imgTipY + 16 / zoom);
-          ctx.restore();
-        }
-      }
-
-      // 虚像・焦点上で光がスクリーンに当たったときのぼんやりした光斑
-      if (isLightActive && animProgress > 0.65 && opt.type !== 'real') {
-        ctx.save();
-        const midY = (opt.y1AtScreen + opt.y2AtScreen) / 2;
-        const spread = Math.max(24, Math.abs(opt.y1AtScreen - opt.y2AtScreen) * 0.7);
-        const grad = ctx.createRadialGradient(sx, midY, 0, sx, midY, spread);
-        grad.addColorStop(0, 'rgba(253, 224, 71, 0.22)');
-        grad.addColorStop(1, 'rgba(253, 224, 71, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.ellipse(sx, midY, 10, spread, 0, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.font = `bold ${10.5 / zoom}px "Noto Sans JP"`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`ピント位置 (${opt.v.toFixed(1)}cm)`, opt.imgX, opt.imgTipY + 16 / zoom);
         ctx.restore();
       }
 
+      ctx.restore();
       ctx.restore();
     }
 
     // 虚像（正立・破線輪郭・幻想的な光彩）と「目」のアイコン描画
     function drawVirtualImageAndEye(opt) {
       if (opt.type !== 'virtual') return;
+      // 消灯中やレンズ通過前はネタバレ防止のため表示しない
+      if (!isLightActive || animProgress < 0.55) return;
 
-      // レンズの右側からのぞき込む「目」のイラスト（虚像モードであることを視覚化）
+      // レンズの右側からのぞき込む「目」のイラスト（光が広がり始めたタイミングでフェードイン）
+      const eyeAlpha = Math.min(1, (animProgress - 0.55) / 0.12);
       ctx.save();
-      const eyeX = 16.5 * PX_PER_CM;
-      const eyeY = -4.2 * PX_PER_CM;
+      ctx.globalAlpha = eyeAlpha;
 
-      ctx.translate(eyeX, eyeY);
-      // 目の輪郭
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.strokeStyle = '#c084fc';
-      ctx.lineWidth = 2 / zoom;
+      const eyeX = 25.5 * PX_PER_CM;
+      const eyeY = 2.0 * PX_PER_CM;
+
+      // 目の外形（左のレンズ方向を向く）
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.fillStyle = '#0f172a';
+      ctx.lineWidth = 2.2 / zoom;
       ctx.beginPath();
-      ctx.moveTo(-18, 0);
-      ctx.quadraticCurveTo(0, -13, 18, 0);
-      ctx.quadraticCurveTo(0, 13, -18, 0);
+      ctx.moveTo(eyeX - 18, eyeY);
+      ctx.quadraticCurveTo(eyeX + 4, eyeY - 16, eyeX + 20, eyeY);
+      ctx.quadraticCurveTo(eyeX + 4, eyeY + 16, eyeX - 18, eyeY);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // 瞳
-      ctx.fillStyle = '#d8b4fe';
+      // 瞳（レンズ方向を向く）
+      ctx.fillStyle = '#38bdf8';
       ctx.beginPath();
-      ctx.arc(-4, 0, 5.5, 0, Math.PI * 2);
+      ctx.arc(eyeX - 6, eyeY, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
-      ctx.arc(-5, 0, 2.5, 0, Math.PI * 2);
+      ctx.arc(eyeX - 8, eyeY, 2.8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#e9d5ff';
+      ctx.fillStyle = '#cbd5e1';
       ctx.font = `bold ${10.5 / zoom}px "Noto Sans JP"`;
       ctx.textAlign = 'center';
-      ctx.fillText('ここからレンズをのぞく', 0, -18 / zoom);
+      ctx.textBaseline = 'top';
+      ctx.fillText('ここからレンズをのぞく', eyeX, eyeY + 16 / zoom);
       ctx.restore();
 
-      // 延長線が交わった後に正立虚像を浮かび上がらせる
-      if (!isLightActive || animProgress < 0.86) return;
-
-      const appearAlpha = Math.min(1, (animProgress - 0.86) / 0.14);
-      const vx = opt.imgX;
-      const vTipY = opt.imgTipY; // マイナス（上向き）
+      // 延長線が交わったタイミング(0.88〜)で正立虚像を浮かび上がらせる
+      if (animProgress < 0.88) return;
+      const vAlpha = Math.min(1, (animProgress - 0.88) / 0.10);
 
       ctx.save();
-      ctx.globalAlpha = appearAlpha;
+      ctx.globalAlpha = vAlpha;
 
-      // 虚像の背景グロー
+      const vx = opt.imgX;
+      const tipY = opt.imgTipY;
+      const headSize = Math.max(12, Math.min(24, Math.abs(tipY) * 0.18));
+      const headW = headSize * 0.65;
+
+      // 幻想的なパープルグロー
       ctx.shadowColor = '#c084fc';
       ctx.shadowBlur = 18;
 
-      const headSize = Math.max(12, Math.min(26, Math.abs(vTipY) * 0.16));
-      const headW = headSize * 0.62;
-
-      // 半透明の矢印本体（虚像だと一目でわかる破線アウトライン＋紫の輝き）
-      ctx.strokeStyle = 'rgba(216, 180, 254, 0.9)';
-      ctx.lineWidth = 6 / zoom;
-      ctx.setLineDash([8 / zoom, 5 / zoom]);
+      // 破線枠の正立矢印（虚像であることを視覚的に明確化）
+      ctx.strokeStyle = '#d8b4fe';
+      ctx.lineWidth = 5 / zoom;
+      ctx.setLineDash([7 / zoom, 5 / zoom]);
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(vx, 0);
-      ctx.lineTo(vx, vTipY + headSize * 0.7);
+      ctx.lineTo(vx, tipY + headSize * 0.7);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // 矢印先端
-      ctx.fillStyle = 'rgba(233, 213, 255, 0.82)';
-      ctx.strokeStyle = '#c084fc';
-      ctx.lineWidth = 2 / zoom;
+      // 矢印先端（半透明塗り＋破線縁取り）
+      ctx.fillStyle = 'rgba(216, 180, 254, 0.45)';
+      ctx.strokeStyle = '#f3e8ff';
+      ctx.lineWidth = 2.2 / zoom;
       ctx.beginPath();
-      ctx.moveTo(vx, vTipY);
-      ctx.lineTo(vx - headW, vTipY + headSize);
-      ctx.lineTo(vx + headW, vTipY + headSize);
+      ctx.moveTo(vx, tipY);
+      ctx.lineTo(vx - headW, tipY + headSize);
+      ctx.lineTo(vx + headW, tipY + headSize);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // 先端の交点ハイライト
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(vx, vTipY, 4.5 / zoom, 0, Math.PI * 2);
-      ctx.fill();
+      // 交点の光マーク
+      drawPhoton(vx, tipY, '#d8b4fe', 5.5 / zoom);
 
-      ctx.restore();
-
-      // 虚像ラベルバッジ
-      if (showInfo && appearAlpha > 0.5) {
+      if (showInfo && vAlpha > 0.6) {
         drawImageCallout(
           vx,
-          vTipY - 22 / zoom,
+          tipY - 24 / zoom,
           `正立虚像：左 ${Math.abs(opt.v).toFixed(1)}cm ／ ${opt.imgHeightCm.toFixed(1)}cm (${opt.mag.toFixed(1)}倍)`,
           '#c084fc',
           '#f3e8ff'
         );
       }
-    }
 
-    // 像の情報吹き出しバッジ描画ヘルパー
-    function drawImageCallout(x, y, text, borderColor, textColor) {
-      ctx.save();
-      ctx.font = `900 ${11.5 / zoom}px "Noto Sans JP"`;
-      const tw = ctx.measureText(text).width + 18 / zoom;
-      const th = 24 / zoom;
-
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = 1.8 / zoom;
-      ctx.beginPath();
-      ctx.roundRect(x - tw / 2, y - th / 2, tw, th, 8 / zoom);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = textColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, x, y);
       ctx.restore();
     }
 
-    // ==========================================
-    // 光線レーザー・矢印・フォトン描画（参考index.html準拠）
-    // ==========================================
+    // 3層発光レーザー描画関数
     function drawLaserSegment(x1, y1, x2, y2, style) {
       ctx.save();
       ctx.lineCap = 'round';
@@ -1172,6 +1205,7 @@
       ctx.restore();
     }
 
+    // 光線上の進行方向矢印（▶）
     function drawDirectionArrow(x1, y1, x2, y2, ratio, color, size = 8.5) {
       const ax = x1 + (x2 - x1) * ratio;
       const ay = y1 + (y2 - y1) * ratio;
@@ -1194,6 +1228,7 @@
       ctx.restore();
     }
 
+    // 光粒子（フォトン）の描画
     function drawPhoton(x, y, color, r = 6) {
       ctx.save();
       const grad = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2);
@@ -1216,127 +1251,146 @@
     function drawAnimatedRays(opt) {
       const isVirtual = opt.type === 'virtual';
 
-      // フェーズ分割（実像：0〜0.42 レンズまで、0.42〜0.90 スクリーンまで）
-      // 虚像：0〜0.34 レンズまで、0.34〜0.64 右へ広がる、0.64〜0.88 左へ逆向き延長点線
+      // フェーズ分割（実像：0〜0.42 レンズまで、0.42〜0.88 集光点まで→到達瞬間にスクリーン出現）
+      // 虚像：0〜0.34 レンズまで、0.34〜0.64 右へ広がる、0.64〜0.88 左へ逆向き延長点線→虚像出現
       const tLens = isVirtual ? 0.34 : 0.42;
-      const tRight = isVirtual ? 0.64 : 0.90;
+      const tRight = isVirtual ? 0.64 : 0.88;
       const tExtEnd = 0.88;
 
       const rays = [
         {
           style: RAY_COLORS.parallel,
-          sx: opt.sx, sy: opt.sy,
-          lx: 0, ly: opt.sy,
-          rx: opt.rightEndX, ry: opt.y1AtScreen
+          sx: opt.sx,
+          sy: opt.sy,
+          lensX: 0,
+          lensY: opt.sy,
+          endX: opt.rightEndX,
+          endY: opt.y1AtRight
         },
         {
           style: RAY_COLORS.center,
-          sx: opt.sx, sy: opt.sy,
-          lx: 0, ly: 0,
-          rx: opt.rightEndX, ry: opt.y2AtScreen
+          sx: opt.sx,
+          sy: opt.sy,
+          lensX: 0,
+          lensY: 0,
+          endX: opt.rightEndX,
+          endY: opt.y2AtRight
         }
       ];
 
+      ctx.save();
+
       rays.forEach(ray => {
-        // 第1区間：光源先端 -> レンズ
+        // 第1区間：光源先端 -> 凸レンズ
         if (animProgress > 0) {
           const p1 = Math.min(1, animProgress / tLens);
-          const cx1 = ray.sx + (ray.lx - ray.sx) * p1;
-          const cy1 = ray.sy + (ray.ly - ray.sy) * p1;
+          const curX1 = ray.sx + (ray.lensX - ray.sx) * p1;
+          const curY1 = ray.sy + (ray.lensY - ray.sy) * p1;
 
-          drawLaserSegment(ray.sx, ray.sy, cx1, cy1, ray.style);
+          drawLaserSegment(ray.sx, ray.sy, curX1, curY1, ray.style);
 
-          if (p1 > 0.55 && Math.hypot(ray.lx - ray.sx, ray.ly - ray.sy) > 35) {
-            drawDirectionArrow(ray.sx, ray.sy, ray.lx, ray.ly, 0.5, ray.style.shadow);
+          if (p1 > 0.55) {
+            drawDirectionArrow(ray.sx, ray.sy, ray.lensX, ray.lensY, 0.52, ray.style.shadow);
           }
+
           if (p1 < 1) {
-            drawPhoton(cx1, cy1, ray.style.mid, 6.5 / zoom);
+            drawPhoton(curX1, curY1, ray.style.mid, 6.5 / zoom);
           } else {
-            drawPhoton(ray.lx, ray.ly, ray.style.mid, 4.5 / zoom);
+            drawPhoton(ray.lensX, ray.lensY, ray.style.mid, 4.5 / zoom);
           }
         }
 
-        // 第2区間：レンズ -> 右側（スクリーンまで）
+        // 第2区間：凸レンズ -> 右側（集光点／スクリーン、または発散）
         if (animProgress > tLens) {
           const p2 = Math.min(1, (animProgress - tLens) / (tRight - tLens));
-          const cx2 = ray.lx + (ray.rx - ray.lx) * p2;
-          const cy2 = ray.ly + (ray.ry - ray.ly) * p2;
+          const curX2 = ray.lensX + (ray.endX - ray.lensX) * p2;
+          const curY2 = ray.lensY + (ray.endY - ray.lensY) * p2;
 
-          drawLaserSegment(ray.lx, ray.ly, cx2, cy2, ray.style);
+          drawLaserSegment(ray.lensX, ray.lensY, curX2, curY2, ray.style);
 
-          if (p2 > 0.5) {
-            drawDirectionArrow(ray.lx, ray.ly, ray.rx, ray.ry, 0.48, ray.style.shadow);
+          if (p2 > 0.45) {
+            drawDirectionArrow(ray.lensX, ray.lensY, ray.endX, ray.endY, 0.48, ray.style.shadow);
           }
+
           if (p2 < 1) {
-            drawPhoton(cx2, cy2, ray.style.mid, 6.5 / zoom);
+            drawPhoton(curX2, curY2, ray.style.mid, 6.5 / zoom);
           }
         }
 
-        // 第3区間（虚像時のみ）：レンズ通過点から左側の虚像先端へ逆向き延長点線を伸ばす
+        // 第3区間（虚像時のみ）：レンズから左の虚像先端へ向かう逆向き延長点線
         if (isVirtual && animProgress > tRight) {
           const p3 = Math.min(1, (animProgress - tRight) / (tExtEnd - tRight));
-          const ex = ray.lx + (opt.imgX - ray.lx) * p3;
-          const ey = ray.ly + (opt.imgTipY - ray.ly) * p3;
+          const curEx = ray.lensX + (opt.imgX - ray.lensX) * p3;
+          const curEy = ray.lensY + (opt.imgTipY - ray.lensY) * p3;
 
           ctx.save();
-          ctx.strokeStyle = RAY_COLORS.virtualExt.line;
-          ctx.shadowColor = RAY_COLORS.virtualExt.glow;
-          ctx.shadowBlur = 8;
+          ctx.strokeStyle = 'rgba(216, 180, 254, 0.85)';
           ctx.lineWidth = 2.4 / zoom;
           ctx.setLineDash([7 / zoom, 5 / zoom]);
           ctx.beginPath();
-          ctx.moveTo(ray.lx, ray.ly);
-          ctx.lineTo(ex, ey);
+          ctx.moveTo(ray.lensX, ray.lensY);
+          ctx.lineTo(curEx, curEy);
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.restore();
 
           if (p3 < 1) {
-            drawPhoton(ex, ey, '#d8b4fe', 5.5 / zoom);
+            drawPhoton(curEx, curEy, '#d8b4fe', 5 / zoom);
           }
         }
 
-        // アニメーション完了後のゆっくり光パルス演出
+        // アニメーション完了後の光パルス演出
         if (animProgress >= 1.0) {
-          if (pulseTime <= 0.45) {
-            const pr = pulseTime / 0.45;
+          const splitPulse = 0.42;
+          if (pulseTime <= splitPulse) {
+            const pr = pulseTime / splitPulse;
             drawPhoton(
-              ray.sx + (ray.lx - ray.sx) * pr,
-              ray.sy + (ray.ly - ray.sy) * pr,
+              ray.sx + (ray.lensX - ray.sx) * pr,
+              ray.sy + (ray.lensY - ray.sy) * pr,
               ray.style.mid,
-              5 / zoom
+              5.5 / zoom
             );
           } else {
-            const pr = (pulseTime - 0.45) / 0.55;
+            const pr = (pulseTime - splitPulse) / (1 - splitPulse);
             drawPhoton(
-              ray.lx + (ray.rx - ray.lx) * pr,
-              ray.ly + (ray.ry - ray.ly) * pr,
+              ray.lensX + (ray.endX - ray.lensX) * pr,
+              ray.lensY + (ray.endY - ray.lensY) * pr,
               ray.style.mid,
-              5 / zoom
+              5.5 / zoom
             );
           }
         }
       });
+
+      ctx.restore();
     }
 
-    // ==========================================
-    // 右上ミニモニター描画（スクリーン正面／虫めがね視点）
-    // ==========================================
+    // 右上ミニモニター（スクリーン正面／虫めがね視点）の描画
     function drawPreviewMonitor(opt) {
       const pw = previewCanvas.width;
       const ph = previewCanvas.height;
       pCtx.clearRect(0, 0, pw, ph);
 
-      // 背景と十字グリッド
+      // 背景と中央クロスヘア
       pCtx.fillStyle = '#020617';
       pCtx.fillRect(0, 0, pw, ph);
 
-      pCtx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+      pCtx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
       pCtx.lineWidth = 1;
       pCtx.beginPath();
-      pCtx.moveTo(pw / 2, 0); pCtx.lineTo(pw / 2, ph);
-      pCtx.moveTo(0, ph / 2); pCtx.lineTo(pw, ph / 2);
+      pCtx.moveTo(pw / 2, 0);
+      pCtx.lineTo(pw / 2, ph);
+      pCtx.moveTo(0, ph / 2);
+      pCtx.lineTo(pw, ph / 2);
       pCtx.stroke();
+
+      if (!isLightActive || animProgress < 0.88) {
+        previewTitle.textContent = '📺 像の見え方';
+        previewTitle.className = 'text-[10px] font-black text-slate-300';
+        previewFocusTag.textContent = isLightActive ? '移動中…' : '予想中';
+        previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400';
+        return;
+      }
 
       if (opt.type === 'virtual') {
         previewTitle.textContent = '🔎 レンズの奥を見る';
@@ -1346,87 +1400,85 @@
         previewTitle.className = 'text-[10px] font-black text-cyan-300';
       }
 
-      if (!isLightActive || animProgress < 0.85) {
-        previewFocusTag.textContent = isLightActive ? '移動中…' : '消灯中';
-        previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400';
-        return;
-      }
-
       if (opt.type === 'real') {
-        if (opt.isFocused) {
-          previewFocusTag.textContent = 'くっきり';
-          previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
-        } else {
-          previewFocusTag.textContent = 'ぼやけ';
-          previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300';
-        }
+        const blur = opt.isFocused ? 0 : Math.min(10, opt.spreadPx * 0.18);
+        const arrowLen = Math.min(ph * 0.44, Math.max(10, opt.imgHeightCm * 6.5));
 
-        // 基準高さ 3cm = 20px でスケーリング（下向き倒立）
-        const arrowLen = Math.min(48, Math.max(8, opt.imgHeightCm * 6.5));
-        const blurPx = opt.isFocused ? 0 : Math.min(14, opt.spreadPx * 0.25);
+        previewFocusTag.textContent = opt.isFocused ? 'くっきり' : 'ぼやけ';
+        previewFocusTag.className = opt.isFocused
+          ? 'text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300'
+          : 'text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300';
 
         pCtx.save();
-        pCtx.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
-        pCtx.globalAlpha = opt.isFocused ? 1 : Math.max(0.35, 1 - blurPx / 18);
-
-        // 倒立矢印（中心から下へ）
+        if (blur > 0.3) {
+          pCtx.filter = `blur(${blur.toFixed(1)}px)`;
+        }
         pCtx.strokeStyle = '#fbbf24';
+        pCtx.fillStyle = '#fef08a';
         pCtx.lineWidth = 4;
         pCtx.lineCap = 'round';
+
+        // 倒立（下向き）矢印
+        const cx = pw / 2;
+        const startY = ph / 2;
+        const endY = startY + arrowLen;
+        const hs = Math.min(12, arrowLen * 0.35);
+
         pCtx.beginPath();
-        pCtx.moveTo(pw / 2, ph / 2);
-        pCtx.lineTo(pw / 2, ph / 2 + arrowLen - 6);
+        pCtx.moveTo(cx, startY);
+        pCtx.lineTo(cx, endY - hs * 0.6);
         pCtx.stroke();
 
-        pCtx.fillStyle = '#fef08a';
         pCtx.beginPath();
-        pCtx.moveTo(pw / 2, ph / 2 + arrowLen);
-        pCtx.lineTo(pw / 2 - 7, ph / 2 + arrowLen - 10);
-        pCtx.lineTo(pw / 2 + 7, ph / 2 + arrowLen - 10);
+        pCtx.moveTo(cx, endY);
+        pCtx.lineTo(cx - hs * 0.7, endY - hs);
+        pCtx.lineTo(cx + hs * 0.7, endY - hs);
         pCtx.closePath();
         pCtx.fill();
         pCtx.restore();
       } else if (opt.type === 'virtual') {
-        previewFocusTag.textContent = `${opt.mag.toFixed(1)}倍`;
+        previewFocusTag.textContent = `${opt.mag.toFixed(1)}倍拡大`;
         previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-200';
 
-        // 虫めがね円枠
+        // 虫めがね枠
         pCtx.save();
-        pCtx.strokeStyle = 'rgba(192, 132, 252, 0.5)';
+        pCtx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
         pCtx.lineWidth = 2;
         pCtx.beginPath();
-        pCtx.arc(pw / 2, ph / 2, 48, 0, Math.PI * 2);
+        pCtx.arc(pw / 2, ph / 2, pw * 0.44, 0, Math.PI * 2);
         pCtx.stroke();
 
-        // 大きな正立矢印（下から上へ）
-        const arrowLen = Math.min(80, opt.imgHeightCm * 5.2);
-        const baseY = ph / 2 + arrowLen * 0.35;
-        const tipY = baseY - arrowLen;
+        const arrowLen = Math.min(ph * 0.44, Math.max(18, opt.imgHeightCm * 4.5));
+        const cx = pw / 2;
+        const startY = ph / 2;
+        const endY = startY - arrowLen;
+        const hs = Math.min(14, arrowLen * 0.32);
 
+        // 正立（上向き）矢印
         pCtx.strokeStyle = '#d8b4fe';
+        pCtx.fillStyle = '#f3e8ff';
         pCtx.lineWidth = 5;
         pCtx.lineCap = 'round';
         pCtx.beginPath();
-        pCtx.moveTo(pw / 2, baseY);
-        pCtx.lineTo(pw / 2, tipY + 10);
+        pCtx.moveTo(cx, startY);
+        pCtx.lineTo(cx, endY + hs * 0.6);
         pCtx.stroke();
 
-        pCtx.fillStyle = '#f3e8ff';
         pCtx.beginPath();
-        pCtx.moveTo(pw / 2, tipY);
-        pCtx.lineTo(pw / 2 - 10, tipY + 14);
-        pCtx.lineTo(pw / 2 + 10, tipY + 14);
+        pCtx.moveTo(cx, endY);
+        pCtx.lineTo(cx - hs * 0.7, endY + hs);
+        pCtx.lineTo(cx + hs * 0.7, endY + hs);
         pCtx.closePath();
         pCtx.fill();
         pCtx.restore();
       } else {
         previewFocusTag.textContent = '像なし';
-        previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-700 text-slate-300';
+        previewFocusTag.className = 'text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-800 text-slate-400';
       }
     }
 
     // ==========================================
-    // メインアニメーションループ
+    // メインレンダリングループ
     // ==========================================
     function render() {
       ctx.clearRect(0, 0, width, height);
@@ -1436,6 +1488,10 @@
       if (isLightActive) {
         if (isAnimating) {
           animProgress += ANIM_SPEED;
+          if (!hasRevealedResult && animProgress >= 0.88) {
+            hasRevealedResult = true;
+            updateUI();
+          }
           if (animProgress >= 1.0) {
             animProgress = 1.0;
             isAnimating = false;
@@ -1451,7 +1507,7 @@
 
       drawGridAndRuler();
       drawConvexLens();
-      drawFocalMarkers();
+      drawFocalPoints();
 
       if (isLightActive) {
         drawAnimatedRays(opt);
@@ -1459,7 +1515,7 @@
 
       drawScreenAndRealImage(opt);
       drawVirtualImageAndEye(opt);
-      drawObjectArrow(opt);
+      drawLightSource(opt);
 
       ctx.restore();
 
@@ -1469,7 +1525,7 @@
     }
 
     // ==========================================
-    // インタラクション（マウス ＆ タッチ操作）
+    // ポインター・タッチ操作ハンドラー
     // ==========================================
     function getPointerPos(e) {
       const rect = canvas.getBoundingClientRect();
@@ -1489,6 +1545,7 @@
       const hitScale = Math.max(1, 1 / zoom);
       const sx = -sourceDistCm * PX_PER_CM;
       const screenX = screenDistCm * PX_PER_CM;
+      const opt = calculateOptics();
 
       // 光源の当たり判定
       if (
@@ -1499,8 +1556,9 @@
         return 'source';
       }
 
-      // スクリーンの当たり判定
+      // スクリーンの当たり判定（スクリーンが表示されている実像時のみ操作可能）
       if (
+        isScreenVisible(opt) &&
         Math.abs(wp.x - screenX) <= 24 * hitScale &&
         wp.y >= -SCREEN_HALF_H_CM * PX_PER_CM - 20 * hitScale &&
         wp.y <= SCREEN_HALF_H_CM * PX_PER_CM + 30 * hitScale
@@ -1516,11 +1574,13 @@
         isLightActive = true;
         animProgress = 0;
         isAnimating = true;
+        hasRevealedResult = false;
         pulseTime = 0;
       } else {
         isLightActive = false;
         animProgress = 0;
         isAnimating = false;
+        hasRevealedResult = false;
       }
       updateUI();
     }
@@ -1529,12 +1589,11 @@
       sourceDistCm = cm;
       isAutoFocus = true;
       syncScreenToAutoFocus();
-      // すでに光が出ている場合は、新しい位置からゆっくり再アニメーション
-      if (isLightActive) {
-        animProgress = 0;
-        isAnimating = true;
-        pulseTime = 0;
-      }
+      // 光源の位置を変えたら予想しやすいように一度消灯し、スクリーンを非表示にする
+      isLightActive = false;
+      animProgress = 0;
+      isAnimating = false;
+      hasRevealedResult = false;
       updateUI();
     }
 
@@ -1565,7 +1624,8 @@
       if (draggingTarget) {
         if (e.cancelable) e.preventDefault();
 
-        if (!hasDragged && Math.hypot(pos.x - pointerDownX, pos.y - pointerDownY) < 6) {
+        // タップ時の指の微小なブレはドラッグとみなさない
+        if (!hasDragged && Math.hypot(pos.x - pointerDownX, pos.y - pointerDownY) < 7) {
           return;
         }
         hasDragged = true;
@@ -1574,11 +1634,11 @@
           let newCm = -wp.x / PX_PER_CM;
           newCm = Math.max(MIN_SOURCE_CM, Math.min(MAX_SOURCE_CM, newCm));
 
-          // プリセット値(5, 7, 10, 15, 20, 30cm)の近くで軽くスナップ
+          // プリセット値（30, 20, 15, 10, 7, 5cm）の近くで軽くスナップ
           let snapped = false;
-          for (const target of SNAP_POINTS_CM) {
-            if (Math.abs(newCm - target) < 0.45) {
-              newCm = target;
+          for (const preset of PRESET_POSITIONS) {
+            if (Math.abs(newCm - preset) <= 0.45) {
+              newCm = preset;
               snapped = true;
               break;
             }
@@ -1588,33 +1648,29 @@
           }
 
           sourceDistCm = newCm;
+          isAutoFocus = true;
           syncScreenToAutoFocus();
 
-          // ドラッグ中は連続変化が見やすいように光線をリアルタイム追従させる
-          if (isLightActive) {
-            animProgress = 1.0;
-            isAnimating = false;
-          }
+          // 光源を動かしている間はスクリーンを消し、予想してから光を出せる状態にする
+          isLightActive = false;
+          animProgress = 0;
+          isAnimating = false;
+          hasRevealedResult = false;
           updateUI();
         } else if (draggingTarget === 'screen') {
-          let newCm = wp.x / PX_PER_CM;
-          newCm = Math.max(MIN_SCREEN_CM, Math.min(MAX_SCREEN_CM, newCm));
+          let newScreenCm = wp.x / PX_PER_CM;
+          newScreenCm = Math.max(MIN_SCREEN_CM, Math.min(MAX_SCREEN_CM, newScreenCm));
 
-          // 実像のピント位置の近くで軽くスナップ
           const opt = calculateOptics();
-          if (opt.type === 'real' && Math.abs(newCm - opt.v) < 0.55) {
-            newCm = Math.round(opt.v * 10) / 10;
+          if (opt.type === 'real' && Math.abs(newScreenCm - opt.v) <= 0.55) {
+            newScreenCm = opt.v;
+            isAutoFocus = true;
           } else {
-            newCm = Math.round(newCm * 2) / 2;
+            newScreenCm = Math.round(newScreenCm * 2) / 2;
+            isAutoFocus = false;
           }
 
-          isAutoFocus = false;
-          screenDistCm = newCm;
-
-          if (isLightActive) {
-            animProgress = 1.0;
-            isAnimating = false;
-          }
+          screenDistCm = newScreenCm;
           updateUI();
         } else if (draggingTarget === 'pan') {
           panX = pos.x - panStartX;
@@ -1631,7 +1687,7 @@
     }
 
     function onPointerUp() {
-      // 光源をドラッグせずタップしただけでも光をON/OFFできる
+      // 光源をドラッグせずにタップした場合は光のON/OFFを切り替え
       if (draggingTarget === 'source' && !hasDragged) {
         toggleLight();
       }
@@ -1646,15 +1702,7 @@
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('mouseup', onPointerUp);
 
-    // マウスホイール拡大縮小
-    canvas.addEventListener('wheel', e => {
-      e.preventDefault();
-      const pos = getPointerPos(e);
-      const delta = e.deltaY < 0 ? 0.14 : -0.14;
-      setZoom(zoom + delta, pos.x, pos.y);
-    }, { passive: false });
-
-    // iPadマルチタッチ（1本指ドラッグ ＆ 2本指ピンチズーム）
+    // マルチタッチ（1本指操作 ＆ 2本指ピンチ拡大縮小）
     canvas.addEventListener('touchstart', e => {
       if (e.touches.length === 1) {
         onPointerDown(e);
@@ -1692,9 +1740,19 @@
       }
     });
 
+    // マウスホイールでの拡大縮小
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      setZoom(zoom * factor, mx, my);
+    }, { passive: false });
+
     window.addEventListener('resize', resizeCanvas);
 
-    // 下部UIボタン
+    // UIボタンイベント
     emitLightBtn.addEventListener('click', toggleLight);
 
     posButtons.forEach(btn => {
@@ -1716,12 +1774,13 @@
 
     zoomInBtn.addEventListener('click', () => setZoom(zoom + 0.18));
     zoomOutBtn.addEventListener('click', () => setZoom(zoom - 0.18));
-    zoomResetBtn.addEventListener('click', () => fitToScreen());
+    zoomResetBtn.addEventListener('click', fitToScreen);
 
     resetBtn.addEventListener('click', () => {
       isLightActive = false;
       animProgress = 0;
       isAnimating = false;
+      hasRevealedResult = false;
       sourceDistCm = 30.0;
       isAutoFocus = true;
       showInfo = true;
@@ -1730,12 +1789,18 @@
       updateUI();
     });
 
-    // 初期化＆起動
+    // ==========================================
+    // 初期起動
+    // ==========================================
     window.onload = () => {
-      resizeCanvas();
-      syncScreenToAutoFocus();
-      updateUI();
-      render();
+      try {
+        resizeCanvas();
+        syncScreenToAutoFocus();
+        updateUI();
+        render();
+      } catch (err) {
+        console.error('Initialization error:', err);
+      }
     };
   </script>
 </body>
